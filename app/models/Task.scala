@@ -36,5 +36,20 @@ object Task {
        ).executeUpdate()
      }
   }
-  
+
+  //Devolver tarea con el id pasado por parametros
+  def getTask(id: Long): List[Task]={
+      DB.withConnection { implicit c =>
+         SQL("select * from task where id = {id}").on(
+            'id -> id
+         ).as(task *)
+      }
+   }
+
+  //Devolver la ultima tarea introducida
+  def getLastTask(): List[Task]={
+      DB.withConnection { implicit c =>
+         SQL("select * from task where id = (select max(id) from task)").as(task *)
+      }
+   }
 }
