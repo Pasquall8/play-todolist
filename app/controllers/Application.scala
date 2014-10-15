@@ -16,6 +16,12 @@ object Application extends Controller {
     Redirect(routes.Application.tasks)
   }
 
+  //Para usar el objeto en Json
+  implicit val taskWrites: Writes[Task] = (
+    (JsPath \ "id").write[Long] and
+    (JsPath \ "String").write[String] 
+  )(unlift(Task.unapply))
+
   val taskForm = Form(
      "label" -> nonEmptyText
    )
