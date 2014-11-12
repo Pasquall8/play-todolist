@@ -6,31 +6,44 @@ import anorm.SqlParser._
 import play.api.db._
 import play.api.Play.current
 
-case class Task(id: Long, label: String)
+case class Task(id: Long, label: String, taskOwner: String)
 
 object Task {
 
    val task = {
      get[Long]("id") ~ 
-     get[String]("label") map {
-       case id~label => Task(id, label)
+     get[String]("label") ~//map{
+     get[String]("taskOwner") map {
+       case id~label~taskOwner => Task(id, label, taskOwner)
+       //case id~label => Task(id, label)
      }
    }
   
   def all(): List[Task] = DB.withConnection { implicit c =>
      SQL("select * from task").as(task *)
    }
+
+   def all(taskOwner: String) = DB.withConnection { implicit c =>
+     SQL("select * from task where taskOwner = {taskOwner}").on (
+         'taskOwner -> taskOwner
+      ).as(task *)
+   }
   
-  def create(label: String) {
+  def create(label: String): Option[Long]={
+      create(label,"anonymous")
+  }
+
+  def create(label: String, taskOwner: String): Option[Long]={
       DB.withConnection { implicit c =>
-       SQL("insert into task (label) values ({label})").on(
-         'label -> label
-       ).executeUpdate()
+       SQL("insert into task (label, taskOwner) values ({label},{taskOwner})").on(
+         'label -> label, 
+         'taskOwner -> taskOwner
+       ).executeInsert()
      }
   }
   
   def delete(id: Long) {
-       DB.withConnection { implicit c =>
+      DB.withConnection { implicit c =>
        SQL("delete from task where id = {id}").on(
          'id -> id
        ).executeUpdate()
@@ -38,11 +51,11 @@ object Task {
   }
 
   //Devolver tarea con el id pasado por parametros
-  def getTask(id: Long): List[Task]={
+  def getTask(id: Long): Option[Task]={
       DB.withConnection { implicit c =>
          SQL("select * from task where id = {id}").on(
             'id -> id
-         ).as(task *)
+         ).as(Task.task.singleOpt)
       }
    }
 

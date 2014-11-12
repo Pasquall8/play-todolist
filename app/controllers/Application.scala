@@ -9,6 +9,7 @@ import play.api.data._
 import play.api.data.Forms._
 
 import models.Task
+import models.User
 
 object Application extends Controller {
   
@@ -19,7 +20,8 @@ object Application extends Controller {
   //Para usar el objeto en Json
   implicit val taskWrites: Writes[Task] = (
     (JsPath \ "id").write[Long] and
-    (JsPath \ "String").write[String] 
+    (JsPath \ "String").write[String] and
+    (JsPath \ "taskOwner").write[String]
   )(unlift(Task.unapply))
 
   val taskForm = Form(
@@ -31,17 +33,42 @@ object Application extends Controller {
       var json = Json.toJson(Task.all())
       Ok(json)
    }
+
+   //Devuelve el JSON con la lista de la tarea de un usuario
+   def tasksUser(taskOwner: String) = Action {
+    if(User.exists(taskOwner)){
+      Ok(Json.toJson(Task.all(taskOwner)))
+    }
+    else {BadRequest("El usuario: " + taskOwner + " no existe")}
+   }
   
   //Recibe el dato de la nueva tarea (descripcion) en un formulario.
   //Debe devolver un JSON con la descripcion de la nueva tarea creada 
-  //y el codigo HTTP 201 (CREATED)  
-  def newTask = Action { implicit request =>
+  //y el codigo HTTP 201 (CREATED)
+   def newTask = Action { implicit request =>
      taskForm.bindFromRequest.fold(
-       errors => BadRequest(views.html.index(Task.all(), errors)),
+       errors => BadRequest("Datos incorrectos"),
        label => {
-          Task.create(label)
-          var json = Json.toJson(Task.getLastTask())
-          Created(json)
+          Task.create(label) match {
+            case Some(id) => Created(Json.toJson(Task.getTask(id)))
+            case None => InternalServerError("La tarea no ha sido encontrada")
+          }
+       }
+     )
+   }
+
+  //Ademas introduce el usuario  
+  def newUserTask(taskOwner: String) = Action { implicit request =>
+     taskForm.bindFromRequest.fold(
+       errors => BadRequest("Datos incorrectos"),
+       label => {
+          if(User.exists(taskOwner)){
+            Task.create(label, taskOwner) match {
+              case Some(id) => Created(Json.toJson(Task.getTask(id)))
+              case None => InternalServerError("La tarea no ha sido encontrada")
+            }
+          }
+          else NotFound("El usuario no existe")          
        }
      )
    }
@@ -57,10 +84,13 @@ object Application extends Controller {
     }
   }
 
-  //Devuelve la representacion JSON de la tarea cuyo identificador se pasa en al URI
+  //Devuelve la representacion JSON de la tarea cuyo identificador se pasa en al URL
   def searchTask(id: Long) = Action {
-    var json = Json.toJson(Task.getTask(id))
-    Ok(json)
+    val task:Option[Task] = Task.getTask(id)
+    task match {
+       case Some(t) => Ok(Json.toJson(t))
+       case None => NotFound("404 Tarea no encontrada")
+    }
   }
   
 }
